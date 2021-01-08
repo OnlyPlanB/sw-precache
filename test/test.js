@@ -207,6 +207,34 @@ describe('sw-precache core functionality', function() {
     });
   });
 
+  describe('with dynamicUrlToDependencies', function() {
+    it('should allow passing a string value', function() {
+      var config = {
+        logger: NOOP,
+        dynamicUrlToDependencies: {
+          'foo.png': 'abc'
+        }
+      };
+
+      return generate(config).then(function(responseString) {
+        assert.notEqual(responseString.indexOf('["foo.png","900150983cd24fb0d6963f7d28e17f72"]'), -1);
+      });
+    });
+
+    it('should allow passing a Buffer instance', function() {
+      var config = {
+        logger: NOOP,
+        dynamicUrlToDependencies: {
+          'foo.png': new Buffer([0x00, 0x01, 0x02])
+        }
+      };
+
+      return generate(config).then(function(responseString) {
+        assert.notEqual(responseString.indexOf('["foo.png","b95f67f61ebb03619622d798f45fc2d3"]'), -1);
+      });
+    });
+  });
+
   after(function() {
     fs.unlinkSync(TEMP_FILE);
   });
@@ -332,9 +360,9 @@ describe('stripIgnoredUrlParameters', function() {
     done();
   });
 
-  it('should work when there\'s a hash fragment', function(done) {
+  it('should remove the hash fragment', function(done) {
     var strippedUrl = externalFunctions.stripIgnoredUrlParameters(testUrl + '#hash', [/^t/, /^f/]);
-    assert.strictEqual(strippedUrl, 'http://example.com/index.html?one=1#hash');
+    assert.strictEqual(strippedUrl, 'http://example.com/index.html?one=1');
     done();
   });
 });
@@ -410,14 +438,21 @@ describe('createCacheKey', function() {
     done();
   });
 
-  it('should not append the parameter when the URL matches the exclusion pattern', function(done) {
+  it('should append the parameter when the origin matches the exclusion pattern, but the pathname does not match', function(done) {
     var url = 'http://example.com/test/path?existing=value';
     var cacheKey = externalFunctions.createCacheKey(url, 'name', 'value', /example/);
-    assert.strictEqual(cacheKey, url);
+    assert.strictEqual(cacheKey, 'http://example.com/test/path?existing=value&name=value');
     done();
   });
 
-  it('should append the parameter when the URL does not match the exclusion pattern', function(done) {
+  it('should not append the parameter when the pathname matches the exclusion pattern', function(done) {
+    var url = 'http://example.com/test/path?existing=value';
+    var cacheKey = externalFunctions.createCacheKey(url, 'name', 'value', /test\/path/);
+    assert.strictEqual(cacheKey, 'http://example.com/test/path?existing=value');
+    done();
+  });
+
+  it('should append the parameter when the pathname does not match the exclusion pattern', function(done) {
     var url = 'http://example.com/test/path?existing=value';
     var cacheKey = externalFunctions.createCacheKey(url, 'name', 'value', /no_match/);
     assert.strictEqual(cacheKey, 'http://example.com/test/path?existing=value&name=value');
@@ -444,5 +479,78 @@ describe('generateRuntimeCaching', function() {
       handler: 'testHandler'
     }]);
     assert.equal(code, '\ntoolbox.router.get(/test/, toolbox.testHandler, {});');
+  });
+
+  it('should handle origin regex', function() {
+    var code = generateRuntimeCaching([{
+      urlPattern: '/*',
+      handler: 'testHandler',
+      options: {
+        origin: /http:\/\/www.example\.com/
+      }
+    }]);
+    assert.equal(code, '\ntoolbox.router.get("/*", toolbox.testHandler, {"origin":/http:\\/\\/www.example\\.com/});');
+  });
+
+  it('should handle origin string', function() {
+    var code = generateRuntimeCaching([{
+      urlPattern: '/*',
+      handler: 'testHandler',
+      options: {
+        origin: 'http://www.example.com'
+      }
+    }]);
+    assert.equal(code, '\ntoolbox.router.get("/*", toolbox.testHandler, {"origin":"http://www.example.com"});');
+  });
+
+  it('should handle successResponses regex', function() {
+    var code = generateRuntimeCaching([{
+      urlPattern: '/*',
+      handler: 'testHandler',
+      options: {
+        successResponses: /^200$/
+      }
+    }]);
+    assert.equal(code, '\ntoolbox.router.get("/*", toolbox.testHandler, {"successResponses":/^200$/});');
+  });
+});
+
+describe('cleanResponse', function() {
+  var responseText = 'test response body';
+  var globalResponse = global.Response;
+
+  before(function() {
+    if (!globalResponse) {
+      global.Response = require('node-fetch').Response;
+    }
+  });
+
+  it('should return the same response when redirected is false', function() {
+    var originalResponse = new global.Response(responseText);
+    originalResponse.redirected = false;
+
+    return externalFunctions.cleanResponse(originalResponse).then(function(cleanedResponse) {
+      assert.strictEqual(originalResponse, cleanedResponse);
+    });
+  });
+
+  it('should return a new response with the same body when redirected is true', function() {
+    var originalResponse = new global.Response(responseText);
+    originalResponse.redirected = true;
+
+    return externalFunctions.cleanResponse(originalResponse).then(function(cleanedResponse) {
+      assert.notStrictEqual(originalResponse, cleanedResponse);
+
+      var bodyPromises = [originalResponse.text(), cleanedResponse.text()];
+      return Promise.all(bodyPromises).then(function(bodies) {
+        assert.equal(bodies[0], bodies[1]);
+      });
+    });
+  });
+
+  after(function() {
+    if (!globalResponse) {
+      delete global.Response;
+    }
   });
 });

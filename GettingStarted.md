@@ -122,7 +122,7 @@ located as subdirectories of an `app` directory, might look like:
 
 Once you've chosen an appropriate caching strategy to use for your dynamic
 content, you can tell `sw-precache` which
-[strategies](https://github.com/GoogleChrome/sw-toolbox#built-in-handlers) to
+[strategies](https://googlechromelabs.github.io/sw-toolbox/api.html#handlers) to
 use for runtime requests that match specific URL patterns:
 
 ```js
@@ -146,7 +146,7 @@ use for runtime requests that match specific URL patterns:
 
 If you use the `runtimeCaching` option, `sw-precache` will automatically include
 the [`sw-toolbox` library](https://github.com/GoogleChrome/sw-toolbox) and the
-corresponding [routing configuration](https://github.com/GoogleChrome/sw-toolbox#basic-routes)
+corresponding [routing configuration](https://googlechromelabs.github.io/sw-toolbox/usage.html#basic-routes)
 in the service worker file that it generates.
 
 ### Server-side Templating
@@ -156,7 +156,7 @@ construct your App Shell's HTML, it's important to let `sw-precache` know about
 those dependencies.
 
 For example, if your web app has two pages, `/home` and `/about`, each of which
-depends on a both a shared master template and a page-specific template, you can
+depends on both a shared master template and a page-specific template, you can
 represent those dependencies as follows:
 
 ```js
@@ -198,7 +198,6 @@ There are several ready-made examples of varying complexity that use
 - https://github.com/GoogleChrome/sw-precache/tree/master/demo
 - https://github.com/GoogleChrome/sw-precache/tree/master/app-shell-demo
 - https://github.com/GoogleChrome/application-shell
-- https://github.com/GoogleChrome/ioweb2015
 
 # Other Resources
 
